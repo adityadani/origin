@@ -175,7 +175,7 @@ test-unit:
 # Example:
 #   make test-integration
 test-integration:
-	KUBE_COVER=" " KUBE_RACE=" " hack/test-integration.sh
+	hack/test-integration.sh
 .PHONY: test-integration
 
 # Run command tests. Uses whatever binaries are currently built.
@@ -191,8 +191,8 @@ test-cmd: build
 #
 # Example:
 #   make test-end-to-end
-test-end-to-end: build
-	KUBE_COVER=" " KUBE_RACE=" " OS_TEST_PACKAGE=test/end-to-end hack/test-integration.sh
+test-end-to-end:
+	COVERAGE_SPEC=' ' DETECT_RACES='false' TIMEOUT='10m' hack/test-go.sh ./test/end-to-end
 	hack/test-end-to-end.sh
 .PHONY: test-end-to-end
 
@@ -210,18 +210,15 @@ test-tools:
 #   SUITE: Which Bash entrypoint under test/extended/ to use. Don't include the
 #          ending `.sh`. Ex: `core`.
 #   FOCUS: Literal string to pass to `--ginkgo.focus=`
+# The FOCUS env variable is handled by the respective suite scripts.
 #
 # Example:
 #   make test-extended SUITE=core
 #   make test-extended SUITE=conformance FOCUS=pods
+# 
 SUITE ?= conformance
-ifneq ($(strip $(FOCUS)),)
-	FOCUS_ARG=--ginkgo.focus="$(FOCUS)"
-else
-	FOCUS_ARG=
-endif
 test-extended:
-	test/extended/$(SUITE).sh $(FOCUS_ARG)
+	test/extended/$(SUITE).sh
 .PHONY: test-extended
 
 # Run All-in-one OpenShift server.

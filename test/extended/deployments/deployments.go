@@ -1,7 +1,7 @@
 package deployments
 
 import (
-	//"errors"
+	"errors"
 	"fmt"
 	"math/rand"
 	"strings"
@@ -80,10 +80,10 @@ var _ = g.Describe("deploymentconfigs", func() {
 					e2e.Logf("%02d: cancelling deployment", i)
 					if out, err := oc.Run("rollout").Args("cancel", "dc/deployment-simple").Output(); err != nil {
 						// TODO: we should fix this
-						if !strings.Contains(out, "the object has been modified") {
+						if !strings.Contains(out, "the object has been modified") && !strings.Contains(out, "there have been no replication controllers") {
 							o.Expect(err).NotTo(o.HaveOccurred())
 						}
-						e2e.Logf("rollout cancel deployment failed due to conflict: %v", err)
+						e2e.Logf("rollout cancel deployment failed due to known safe error: %v", err)
 					}
 
 				case n < 0.0:
@@ -941,31 +941,22 @@ var _ = g.Describe("deploymentconfigs", func() {
 						return true, nil
 					}
 
-					// FIXME: There is a race between deployer pod updating phase and RC updating AvailableReplicas
-					// FIXME: Enable this when we switch pod acceptors to use RC AvailableReplicas with MinReadySecondsSet
-					//if deployutil.DeploymentStatusFor(rc) == deployapi.DeploymentStatusComplete {
-					//	e2e.Logf("Failed RC: %#v", rc)
-					//	return false, errors.New("deployment shouldn't be completed before ReadyReplicas become AvailableReplicas")
-					//}
+					if deployutil.DeploymentStatusFor(rc) == deployapi.DeploymentStatusComplete {
+						e2e.Logf("Failed RC: %#v", rc)
+						return false, errors.New("deployment shouldn't be completed before ReadyReplicas become AvailableReplicas")
+					}
 					return false, nil
 				})
 			o.Expect(err).NotTo(o.HaveOccurred())
 			o.Expect(rc1.Status.AvailableReplicas).To(o.Equal(dc.Spec.Replicas))
-			// FIXME: There is a race between deployer pod updating phase and RC updating AvailableReplicas
-			// FIXME: Enable this when we switch pod acceptors to use RC AvailableReplicas with MinReadySecondsSet
-			//// Deployment status can't be updated yet but should be right after
-			//o.Expect(deployutil.DeploymentStatusFor(rc1)).To(o.Equal(deployapi.DeploymentStatusRunning))
+			// Deployment status can't be updated yet but should be right after
+			o.Expect(deployutil.DeploymentStatusFor(rc1)).To(o.Equal(deployapi.DeploymentStatusRunning))
 			// It should finish right after
-			// FIXME: remove this condition when the above is fixed
-			if deployutil.DeploymentStatusFor(rc1) != deployapi.DeploymentStatusComplete {
-				// FIXME: remove this assertion when the above is fixed
-				o.Expect(deployutil.DeploymentStatusFor(rc1)).To(o.Equal(deployapi.DeploymentStatusRunning))
-				rc1, err = waitForRCModification(oc, namespace, rc1.Name, deploymentChangeTimeout,
-					rc1.GetResourceVersion(), func(rc *kapiv1.ReplicationController) (bool, error) {
-						return deployutil.DeploymentStatusFor(rc) == deployapi.DeploymentStatusComplete, nil
-					})
-				o.Expect(err).NotTo(o.HaveOccurred())
-			}
+			rc1, err = waitForRCModification(oc, namespace, rc1.Name, deploymentChangeTimeout,
+				rc1.GetResourceVersion(), func(rc *kapiv1.ReplicationController) (bool, error) {
+					return deployutil.DeploymentStatusFor(rc) == deployapi.DeploymentStatusComplete, nil
+				})
+			o.Expect(err).NotTo(o.HaveOccurred())
 
 			// We might check that minReadySecond passed between pods becoming ready
 			// and available but I don't think there is a way to get a timestamp from events
@@ -1091,11 +1082,7 @@ var _ = g.Describe("deploymentconfigs", func() {
 			})
 
 			g.By("deleting owned RCs when deleted", func() {
-				// FIXME: Add delete option when we have new client available.
-				// This is working fine now because of finalizers on RCs but when GC gets fixed
-				// and we remove them this will probably break and will require setting deleteOptions
-				// to achieve cascade delete
-				err = oc.Client().DeploymentConfigs(namespace).Delete(dcName)
+				err = oc.Clientset().AppsV1().DeploymentConfigs(namespace).Delete(dcName, &metav1.DeleteOptions{})
 				o.Expect(err).NotTo(o.HaveOccurred())
 
 				err = wait.PollImmediate(200*time.Millisecond, 5*time.Minute, func() (bool, error) {

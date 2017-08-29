@@ -89392,7 +89392,7 @@
       "format": "int32"
      },
      "revisionHistoryLimit": {
-      "description": "RevisionHistoryLimit is the number of old ReplicationControllers to retain to allow for rollbacks. This field is a pointer to allow for differentiation between an explicit zero and not specified.",
+      "description": "RevisionHistoryLimit is the number of old ReplicationControllers to retain to allow for rollbacks. This field is a pointer to allow for differentiation between an explicit zero and not specified. Defaults to 10. (This only applies to DeploymentConfigs created via the new group API resource, not the legacy resource.)",
       "type": "integer",
       "format": "int32"
      },
@@ -92109,7 +92109,7 @@
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
      },
      "netid": {
-      "description": "NetID is the network identifier of the network namespace assigned to each overlay network packet. This can be manipulated with the \"oadm pod-network\" commands.",
+      "description": "NetID is the network identifier of the network namespace assigned to each overlay network packet. This can be manipulated with the \"oc adm pod-network\" commands.",
       "type": "integer",
       "format": "int64"
      },
@@ -92957,12 +92957,30 @@
    },
    "com.github.openshift.origin.pkg.template.apis.template.v1.TemplateInstanceRequester": {
     "description": "TemplateInstanceRequester holds the identity of an agent requesting a template instantiation.",
-    "required": [
-     "username"
-    ],
     "properties": {
+     "extra": {
+      "description": "extra holds additional information provided by the authenticator.",
+      "type": "object",
+      "additionalProperties": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     },
+     "groups": {
+      "description": "groups represent the groups this user is a part of.",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "uid": {
+      "description": "uid is a unique value that identifies this user across time; if this user is deleted and another user by the same name is added, they will have different UIDs.",
+      "type": "string"
+     },
      "username": {
-      "description": "username is the username of the agent requesting a template instantiation.",
+      "description": "username uniquely identifies this user among all active users.",
       "type": "string"
      }
     }

@@ -2,15 +2,11 @@ package templateinstance
 
 import (
 	"errors"
-	"fmt"
 
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/authentication/user"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	kapi "k8s.io/kubernetes/pkg/api"
 	kapihelper "k8s.io/kubernetes/pkg/api/helper"
@@ -19,6 +15,7 @@ import (
 	rbacregistry "k8s.io/kubernetes/pkg/registry/rbac"
 
 	"github.com/openshift/origin/pkg/authorization/util"
+	template "github.com/openshift/origin/pkg/template"
 	templateapi "github.com/openshift/origin/pkg/template/apis/template"
 	"github.com/openshift/origin/pkg/template/apis/template/validation"
 )
@@ -55,10 +52,13 @@ func (templateInstanceStrategy) Canonicalize(obj runtime.Object) {
 func (templateInstanceStrategy) PrepareForCreate(ctx apirequest.Context, obj runtime.Object) {
 	templateInstance := obj.(*templateapi.TemplateInstance)
 
+	//TODO - when https://github.com/kubernetes-incubator/service-catalog/pull/939 sufficiently progresses, remove the if nil check and always
+	// Clear any user-specified info, then seed it from the context
 	if templateInstance.Spec.Requester == nil {
-		user, _ := apirequest.UserFrom(ctx)
-		templateInstance.Spec.Requester = &templateapi.TemplateInstanceRequester{
-			Username: user.GetName(),
+
+		if user, ok := apirequest.UserFrom(ctx); ok {
+			templateReq := template.ConvertUserToTemplateInstanceRequester(user)
+			templateInstance.Spec.Requester = &templateReq
 		}
 	}
 
@@ -103,29 +103,6 @@ func (s *templateInstanceStrategy) ValidateUpdate(ctx apirequest.Context, obj, o
 	return allErrs
 }
 
-// Matcher returns a generic matcher for a given label and field selector.
-func Matcher(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
-	return storage.SelectionPredicate{
-		Label:    label,
-		Field:    field,
-		GetAttrs: GetAttrs,
-	}
-}
-
-// GetAttrs returns labels and fields of a given object for filtering purposes
-func GetAttrs(o runtime.Object) (labels.Set, fields.Set, bool, error) {
-	obj, ok := o.(*templateapi.TemplateInstance)
-	if !ok {
-		return nil, nil, false, fmt.Errorf("not a TemplateInstance")
-	}
-	return labels.Set(obj.Labels), SelectableFields(obj), obj.Initializers != nil, nil
-}
-
-// SelectableFields returns a field set that can be used for filter selection
-func SelectableFields(obj *templateapi.TemplateInstance) fields.Set {
-	return templateapi.TemplateInstanceToSelectableFields(obj)
-}
-
 func (s *templateInstanceStrategy) validateImpersonationUpdate(templateInstance, oldTemplateInstance *templateapi.TemplateInstance, userinfo user.Info) field.ErrorList {
 	if rbacregistry.IsOnlyMutatingGCFields(templateInstance, oldTemplateInstance, kapihelper.Semantic) {
 		return nil
@@ -145,6 +122,7 @@ func (s *templateInstanceStrategy) validateImpersonation(templateInstance *templ
 			Verb:      "assign",
 			Group:     templateapi.GroupName,
 			Resource:  "templateinstances",
+			Name:      templateInstance.Name,
 		}); err != nil {
 			return field.ErrorList{field.Forbidden(field.NewPath("spec.requester.username"), "you do not have permission to set username")}
 		}

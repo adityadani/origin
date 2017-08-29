@@ -4669,7 +4669,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"revisionHistoryLimit": {
 							SchemaProps: spec.SchemaProps{
-								Description: "RevisionHistoryLimit is the number of old ReplicationControllers to retain to allow for rollbacks. This field is a pointer to allow for differentiation between an explicit zero and not specified.",
+								Description: "RevisionHistoryLimit is the number of old ReplicationControllers to retain to allow for rollbacks. This field is a pointer to allow for differentiation between an explicit zero and not specified. Defaults to 10. (This only applies to DeploymentConfigs created via the new group API resource, not the legacy resource.)",
 								Type:        []string{"integer"},
 								Format:      "int32",
 							},
@@ -8701,7 +8701,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"netid": {
 							SchemaProps: spec.SchemaProps{
-								Description: "NetID is the network identifier of the network namespace assigned to each overlay network packet. This can be manipulated with the \"oadm pod-network\" commands.",
+								Description: "NetID is the network identifier of the network namespace assigned to each overlay network packet. This can be manipulated with the \"oc adm pod-network\" commands.",
 								Type:        []string{"integer"},
 								Format:      "int64",
 							},
@@ -9876,13 +9876,54 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 					Properties: map[string]spec.Schema{
 						"username": {
 							SchemaProps: spec.SchemaProps{
-								Description: "username is the username of the agent requesting a template instantiation.",
+								Description: "username uniquely identifies this user among all active users.",
 								Type:        []string{"string"},
 								Format:      "",
 							},
 						},
+						"uid": {
+							SchemaProps: spec.SchemaProps{
+								Description: "uid is a unique value that identifies this user across time; if this user is deleted and another user by the same name is added, they will have different UIDs.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"groups": {
+							SchemaProps: spec.SchemaProps{
+								Description: "groups represent the groups this user is a part of.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type:   []string{"string"},
+											Format: "",
+										},
+									},
+								},
+							},
+						},
+						"extra": {
+							SchemaProps: spec.SchemaProps{
+								Description: "extra holds additional information provided by the authenticator.",
+								Type:        []string{"object"},
+								AdditionalProperties: &spec.SchemaOrBool{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type: []string{"array"},
+											Items: &spec.SchemaOrArray{
+												Schema: &spec.Schema{
+													SchemaProps: spec.SchemaProps{
+														Type:   []string{"string"},
+														Format: "",
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
 					},
-					Required: []string{"username"},
 				},
 			},
 			Dependencies: []string{},

@@ -130,7 +130,7 @@ func (oc *ovsController) SetupOVS(clusterNetworkCIDR, serviceNetworkCIDR, localS
 	otx.AddFlow("table=30, priority=300, ip, nw_dst=%s, actions=output:2", localSubnetGateway)
 	otx.AddFlow("table=30, priority=100, ip, nw_dst=%s, actions=goto_table:60", serviceNetworkCIDR)
 	if oc.useConnTrack {
-		otx.AddFlow("table=30, priority=300, ip, nw_dst=%s, ct_state=+rpl, actions=ct(nat),goto_table:70", localSubnetCIDR)
+		otx.AddFlow("table=30, priority=300, ip, nw_dst=%s, ct_state=+rpl, actions=ct(nat,table=70)", localSubnetCIDR)
 	}
 	otx.AddFlow("table=30, priority=200, ip, nw_dst=%s, actions=goto_table:70", localSubnetCIDR)
 	otx.AddFlow("table=30, priority=100, ip, nw_dst=%s, actions=goto_table:90", clusterNetworkCIDR)
@@ -366,7 +366,21 @@ func (oc *ovsController) UpdatePod(sandboxID string, vnid uint32) error {
 	return oc.setupPodFlows(ofport, podIP, podMAC, note, vnid)
 }
 
-func (oc *ovsController) TearDownPod(hostVeth, podIP string) error {
+func (oc *ovsController) TearDownPod(hostVeth, podIP, sandboxID string) error {
+	if podIP == "" {
+		flows, err := oc.ovs.DumpFlows()
+		if err != nil {
+			return err
+		}
+		_, ip, _, _, err := getPodDetailsBySandboxID(flows, sandboxID)
+		if err != nil {
+			// OVS flows related to sandboxID not found
+			// Nothing needs to be done in that case
+			return nil
+		}
+		podIP = ip
+	}
+
 	err := oc.cleanupPodFlows(podIP)
 	if err != nil {
 		return err
